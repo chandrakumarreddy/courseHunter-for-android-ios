@@ -27,9 +27,17 @@
     public static int d(...);
     public static int i(...);
     public static int w(...);
+    public static int e(...);
+    public static int wtf(...);
+}
+-assumenosideeffects class java.lang.Throwable {
+    public void printStackTrace();
 }
 
 # OkHttp
 -dontwarn com.facebook.**
 -dontwarn okhttp3.**
 -dontwarn okio.**
+
+# pdfiumandroid is built with Kotlin 2.2; its unused coroutine API references a newer stdlib helper.
+-dontwarn kotlin.coroutines.jvm.internal.SpillingKt

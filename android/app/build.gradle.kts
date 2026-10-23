@@ -81,6 +81,8 @@ android {
 
     kotlinOptions {
         jvmTarget = "17"
+        // pdfiumandroid is built with a newer Kotlin; its API is plain enough to read anyway.
+        freeCompilerArgs += "-Xskip-metadata-version-check"
     }
 
     lint {
@@ -92,6 +94,7 @@ tasks.matching { it.name == "preReleaseBuild" }.configureEach { dependsOn(syncLy
 
 dependencies {
     implementation("androidx.core:core-ktx:1.13.1")
+    implementation("androidx.swiperefreshlayout:swiperefreshlayout:1.1.0")
 
     // primjsWasm only adds WebAssembly, which the app doesn't use; Lynx logs and carries on without it.
     implementation("org.lynxsdk.lynx:lynx:$lynxVersion") { exclude(group = "org.lynxsdk.lynx", module = "primjsWasm") }
@@ -104,4 +107,5 @@ dependencies {
     implementation("org.lynxsdk.lynx:xelement-webview:$lynxVersion")
 
     implementation("com.squareup.okhttp3:okhttp:4.9.0")
+    implementation("io.legere:pdfiumandroid:1.0.35")
 }

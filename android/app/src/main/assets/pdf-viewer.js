@@ -63,6 +63,9 @@
           if (!url) return;
           obj.removeAttribute('data');
           obj.__chUrl = url;
+          // Start downloading now (Wi-Fi only) so the book is ready when tapped.
+          if (window.CourseHunterApp && CourseHunterApp.prefetchPdf)
+            CourseHunterApp.prefetchPdf(new URL(url, location.href).href);
         };
         take();
         new MutationObserver(take).observe(obj, {
@@ -91,6 +94,27 @@
       open(a.href, a.textContent.trim());
     },
     true,
+  );
+
+  // Pull to refresh only when nothing under the finger is scrolled down (menus, modals, code blocks).
+  document.addEventListener(
+    'touchstart',
+    (e) => {
+      if (!window.CourseHunterApp || !CourseHunterApp.setInnerScrolled) return;
+      var el = e.target;
+      var scrolled = false;
+      for (
+        ;
+        el && el !== document.documentElement && el !== document.body;
+        el = el.parentElement
+      )
+        if (el.scrollTop > 0) {
+          scrolled = true;
+          break;
+        }
+      CourseHunterApp.setInnerScrolled(scrolled);
+    },
+    { capture: true, passive: true },
   );
 
   upgradeObjects();

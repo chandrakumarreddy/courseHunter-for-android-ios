@@ -28,6 +28,7 @@ import android.widget.FrameLayout
 import android.widget.ImageButton
 import android.widget.Toast
 import androidx.core.content.ContextCompat
+import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
 import com.lynx.tasm.LynxError
 import com.lynx.tasm.LynxView
 import com.lynx.tasm.LynxViewBuilder
@@ -36,6 +37,9 @@ import com.lynx.xelement.webview.BehaviorGenerator
 
 class MainActivity : Activity() {
     private lateinit var container: FrameLayout
+    private lateinit var refresh: SwipeRefreshLayout
+    // Set by pdf-viewer.js on touch start: the finger is in a scrolled inner element, so a pull scrolls it instead.
+    @Volatile private var innerScrolled = false
     // The re-rendered view waiting for its first screen before it replaces the current one.
     private var pending: LynxView? = null
     private lateinit var viewToggle: ImageButton
@@ -50,8 +54,28 @@ class MainActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // Keeps the last few books read this week, plus saved ones; anything older goes.
+        if (!cacheTrimmed) {
+            cacheTrimmed = true
+            Thread { Books.trim(applicationContext) }.start()
+        }
         container = FrameLayout(this).apply { setBackgroundColor(BG_COLOR) }
-        setContentView(container)
+        refresh = SwipeRefreshLayout(this).apply {
+            setColorSchemeColors(ACCENT_COLOR)
+            addView(container)
+            // Only from the very top of the page; the WebView isn't the direct child, so check it here.
+            setOnChildScrollUpCallback { _, _ ->
+                val web = configuredWeb
+                web == null || innerScrolled || web.scrollY > 0 || web.canScrollVertically(-1)
+            }
+            setOnRefreshListener {
+                val web = configuredWeb
+                if (web == null) isRefreshing = false else web.reload()
+                // Never spin forever if the page never reports back.
+                postDelayed({ isRefreshing = false }, REFRESH_TIMEOUT_MS)
+            }
+        }
+        setContentView(refresh)
         desktop = getSharedPreferences(PREFS, MODE_PRIVATE).getBoolean(KEY_DESKTOP, false)
         viewToggle = ImageButton(this).apply {
             setBackgroundResource(R.drawable.bg_view_toggle)
@@ -120,6 +144,14 @@ class MainActivity : Activity() {
             web.addJavascriptInterface(object {
                 @JavascriptInterface
                 fun openPdf(url: String, title: String) = runOnUiThread { openPdf(url, title, web.settings.userAgentString) }
+
+                @JavascriptInterface
+                fun setInnerScrolled(scrolled: Boolean) {
+                    innerScrolled = scrolled
+                }
+
+                @JavascriptInterface
+                fun prefetchPdf(url: String) = runOnUiThread { Books.prefetch(this@MainActivity, url, web.settings.userAgentString) }
             }, "CourseHunterApp")
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 val lynxClient = web.webViewClient
@@ -149,11 +181,14 @@ class MainActivity : Activity() {
                         // Fallback only; don't resend the script when onPageCommitVisible already ran it.
                         view.evaluateJavascript("!!window.__chPdf") { if (it != "true") view.evaluateJavascript(pdfViewerJs, null) }
                         viewToggle.visibility = View.VISIBLE
+                        refresh.isRefreshing = false
                         lynxClient.onPageFinished(view, url)
                     }
 
-                    override fun onReceivedError(view: WebView, request: WebResourceRequest, error: WebResourceError) =
+                    override fun onReceivedError(view: WebView, request: WebResourceRequest, error: WebResourceError) {
+                        if (request.isForMainFrame) refresh.isRefreshing = false
                         lynxClient.onReceivedError(view, request, error)
+                    }
 
                     // Renderer crashed or was OOM-killed: unhandled, Android kills the app. Drop the dead WebView
                     // (it must not be touched again) and re-render a fresh one.
@@ -161,6 +196,7 @@ class MainActivity : Activity() {
                         if (configuredWeb === view) {
                             configuredWeb = null
                             viewToggle.visibility = View.GONE
+                            refresh.isRefreshing = false
                             if (pending == null) render()
                         }
                         return true
@@ -296,7 +332,10 @@ class MainActivity : Activity() {
     }
 
     companion object {
+        private var cacheTrimmed = false
         const val BG_COLOR = 0xFFFFFFFF.toInt()
+        const val ACCENT_COLOR = 0xFF8200B0.toInt()
+        const val REFRESH_TIMEOUT_MS = 15_000L
         const val RELOAD_ACTION = "net.coursehunter.app.RELOAD"
         const val SITE_URL = "https://coursehunter.net"
         val DOWNLOAD_EXT = Regex("""\.(zip|rar|7z|tar|gz|mp4|mkv|avi|mov|webm|mp3|epub|djvu)$""", RegexOption.IGNORE_CASE)

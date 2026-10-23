@@ -5,6 +5,7 @@ import { defineConfig, type RsbuildPlugin } from '@lynx-js/rspeedy';
 import { pluginTypeCheck } from '@rsbuild/plugin-type-check';
 
 const PORT = 3000;
+const PROD = process.env.NODE_ENV === 'production';
 const APP_ID = 'net.coursehunter.app';
 
 const androidDevices = () =>
@@ -47,6 +48,18 @@ export default defineConfig({
   // Lynx Android can't load relative asset URLs from the packaged bundle; inline small images.
   output: {
     dataUriLimit: { image: 16 * 1024 },
+  },
+  // Release bundles ship without devtools, debug checks or console output.
+  resolve: PROD
+    ? {
+        alias: {
+          '@lynx-js/preact-devtools': false,
+          '@lynx-js/react/debug': false,
+        },
+      }
+    : {},
+  performance: {
+    removeConsole: PROD,
   },
   server: {
     port: PORT,
