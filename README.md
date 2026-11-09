@@ -13,7 +13,22 @@ One ReactLynx codebase for both platforms: the whole site in a fast WebView, plu
 ![iOS](https://img.shields.io/badge/iOS-Lynx-000000?style=flat-square&logo=apple&logoColor=white)
 ![Bun](https://img.shields.io/badge/Bun-1.3-000000?style=flat-square&logo=bun&logoColor=white)
 
+[![Release](https://img.shields.io/github/v/release/chandrakumarreddy/courseHunter-for-android-ios?style=flat-square&label=release&color=8200B0)](https://github.com/chandrakumarreddy/courseHunter-for-android-ios/releases/latest)
+[![Downloads](https://img.shields.io/github/downloads/chandrakumarreddy/courseHunter-for-android-ios/total?style=flat-square&color=8200B0)](https://github.com/chandrakumarreddy/courseHunter-for-android-ios/releases)
+
+**[🌐 Website](https://coursehunter.net)** · **[📦 Releases](https://github.com/chandrakumarreddy/courseHunter-for-android-ios/releases)** · **[🧩 Packages](https://github.com/chandrakumarreddy?tab=packages&repo_name=courseHunter-for-android-ios)**
+
 </div>
+
+---
+
+## 📲 Download
+
+| Platform | Get it |
+|---|---|
+| 🤖 **Android** | Download `coursehunter.apk` from the [latest release](https://github.com/chandrakumarreddy/courseHunter-for-android-ios/releases/latest) and open it on your phone (allow installs from unknown sources when asked) |
+| 🍎 **iOS** | Run `bun run dev` and scan the QR code with LynxExplorer |
+| 🌐 **Web** | Visit [coursehunter.net](https://coursehunter.net) |
 
 ---
 
@@ -105,6 +120,25 @@ bun run build:android
 Output: `./coursehunter.apk`
 
 > **Signing:** release builds read `android/keystore.properties` (`storeFile`, `storePassword`, `keyAlias`, `keyPassword`). The keystore and its properties are git-ignored. Back up your `.jks`, because every update must be signed with the same key.
+
+---
+
+## 🏷️ Releasing
+
+Push a version tag and GitHub Actions builds the APK and publishes a release with `coursehunter.apk` and `main.lynx.bundle`:
+
+```bash
+git tag v1.0.0 && git push origin v1.0.0
+```
+
+Add these repository secrets so releases are signed with your key (without them, the APK is debug-signed):
+
+| Secret | Value |
+|---|---|
+| `ANDROID_KEYSTORE_BASE64` | `base64 -i android/release.jks` |
+| `ANDROID_KEYSTORE_PASSWORD` | Keystore password |
+| `ANDROID_KEY_ALIAS` | Key alias |
+| `ANDROID_KEY_PASSWORD` | Key password |
 
 ---
 
