@@ -151,6 +151,12 @@ class MainActivity : Activity() {
                 }
 
                 @JavascriptInterface
+                fun setBarColor(css: String) {
+                    val color = parseCssColor(css) ?: return
+                    runOnUiThread { applyBarColor(color) }
+                }
+
+                @JavascriptInterface
                 fun prefetchPdf(url: String) = runOnUiThread { Books.prefetch(this@MainActivity, url, web.settings.userAgentString) }
             }, "CourseHunterApp")
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -174,10 +180,12 @@ class MainActivity : Activity() {
                         if (desktop) view.evaluateJavascript(DESKTOP_VIEWPORT_JS, null)
                         // Early, so the site's PDF <object> is stripped before it downloads much.
                         view.evaluateJavascript(pdfViewerJs, null)
+                        view.evaluateJavascript(THEME_JS, null)
                     }
 
                     override fun onPageFinished(view: WebView, url: String?) {
                         if (desktop) view.evaluateJavascript(DESKTOP_VIEWPORT_JS, null)
+                        view.evaluateJavascript(THEME_JS, null)
                         // Fallback only; don't resend the script when onPageCommitVisible already ran it.
                         view.evaluateJavascript("!!window.__chPdf") { if (it != "true") view.evaluateJavascript(pdfViewerJs, null) }
                         viewToggle.visibility = View.VISIBLE
@@ -241,6 +249,30 @@ class MainActivity : Activity() {
                 .putExtra(PdfReaderActivity.EXTRA_TITLE, title)
                 .putExtra(PdfReaderActivity.EXTRA_USER_AGENT, userAgent)
         )
+    }
+
+    private fun parseCssColor(css: String): Int? {
+        val parts = Regex("""[\d.]+""").findAll(css).map { it.value.toFloat() }.toList()
+        if (parts.size < 3) return null
+        if (parts.size >= 4 && parts[3] == 0f) return null
+        return (0xFF shl 24) or (parts[0].toInt() shl 16) or (parts[1].toInt() shl 8) or parts[2].toInt()
+    }
+
+    private fun applyBarColor(color: Int) {
+        window.statusBarColor = color
+        window.navigationBarColor = color
+        container.setBackgroundColor(color)
+        val r = (color shr 16) and 0xFF
+        val g = (color shr 8) and 0xFF
+        val b = color and 0xFF
+        val light = 0.299 * r + 0.587 * g + 0.114 * b > 150
+        var flags = 0
+        if (light) {
+            flags = View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) flags = flags or View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR
+        }
+        @Suppress("DEPRECATION")
+        window.decorView.systemUiVisibility = flags
     }
 
     private fun desktopUserAgent(mobile: String) = mobile
@@ -345,6 +377,17 @@ class MainActivity : Activity() {
         const val DESKTOP_VIEWPORT_JS = "(function(){var c='width=1280,initial-scale='+(screen.width/1280)+',minimum-scale=0.1';function f(){var m=document.querySelector('meta[name=viewport]');" +
             "if(!m){m=document.createElement('meta');m.name='viewport';(document.head||document.documentElement).appendChild(m)}" +
             "if(m.content!==c)m.content=c}f();document.addEventListener('DOMContentLoaded',f)})()"
+        const val THEME_JS = "(function(){if(window.__chTheme)return;window.__chTheme=1;var last='';" +
+            "function bg(e){return e?getComputedStyle(e).backgroundColor:''}" +
+            "function clear(s){return !s||s==='transparent'||/rgba\\(.*,\\s*0\\)$/.test(s)}" +
+            "function c(){var s=bg(document.body);if(clear(s))s=bg(document.documentElement);if(clear(s))return;" +
+            "if(s!==last){last=s;CourseHunterApp.setBarColor(s)}}" +
+            "function d(){c();setTimeout(c,400)}" +
+            "var o=new MutationObserver(d),f={attributes:true,attributeFilter:['class','style','data-theme','data-bs-theme']};" +
+            "o.observe(document.documentElement,f);" +
+            "function b(){if(document.body)o.observe(document.body,f);d()}" +
+            "if(document.body)b();else document.addEventListener('DOMContentLoaded',b);" +
+            "matchMedia('(prefers-color-scheme: dark)').addEventListener('change',d)})()"
         const val DEV_BUNDLE_URL = "http://localhost:3000/main.lynx.bundle"
     }
 }
